@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kargo Otomat Bulucu</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body, html {
+            height: 100%;
+            background-color: #f4f6f9;
+        }
+
+        /* Üst Bar Tasarımı */
+        .header {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 25px;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            text-align: center;
+            width: 90%;
+            max-width: 450px;
+            pointer-events: auto;
+        }
+
+        .header h1 {
+            font-size: 16px;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+
+        /* Harita Alanı */
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+
+        /* Harita üzerindeki popup (baloncuk) tasarımları */
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+            padding: 5px;
+        }
+        
+        .otomat-popup h3 {
+            color: #e67e22;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .otomat-popup p {
+            font-size: 12px;
+            color: #34495e;
+            line-height: 1.4;
+        }
+
+        /* Yükleniyor Ekranı */
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #e67e22;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #loader p {
+            margin-top: 15px;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <p>Konumunuz hesaplanıyor ve en yakın otomatlar aranıyor...</p>
+    </div>
+
+    <div class="header">
+        <h1>Kargo Otomat Noktaları</h1>
+        <p>Size en yakın otomatı görmek için haritayı inceleyin.</p>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // Harita nesnesini oluşturuyoruz (İlk açılışta Türkiye merkezli)
+        const map = L.map('map').setView([39.9334, 32.8597], 6);
+
+        // Harita görsel katmanını yüklüyoruz (OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap katkı sağlayanlar'
+        }).addTo(map);
+
+        // Mock Data: Yapay Mahalle ve Otomat Bilgileri
+        const mahalleler = ["Yıldız Mahallesi", "Atatürk Mahallesi", "Cumhuriyet Mahallesi", "Yeni Mahalle", "Hürriyet Mahallesi"];
+        const sokaklar = ["Karanfil Sokak", "Gül Caddesi", "Papatya Yanı Sokak", "İstiklal Caddesi", "Deniz Sokak"];
+        
+        // Kullanıcı konumu bulununca çalışacak fonksiyon
+        function onLocationFound(e) {
+            // Yükleniyor ekranını kaldır
+            document.getElementById('loader').style.display = 'none';
+
+            const userCoords = e.latlng;
+
+            // Haritayı kullanıcının konumuna yaklaştır
+            map.setView(userCoords, 15);
+
+            // Kullanıcının olduğu yere mavi bir halka ve marker koyalım
+            L.circle(userCoords, { radius: 100, color: '#3498db', fillColor: '#3498db', fillOpacity: 0.2 }).addTo(map);
+            L.marker(userCoords).addTo(map)
+                .bindPopup("<b>Buradasınız</b><br>Size en yakın otomatlar aşağıda listelenmiştir.")
+                .openPopup();
+
+            // Kullanıcının etrafına rastgele 3 tane kargo otomatı yerleştirelim (Senaryo gereği)
+            for (let i = 0; i < 3; i++) {
+                // Kullanıcının koordinatlarına küçük rastgele değerler ekleyerek yakınlarında otomat türetiyoruz
+                const randomLat = userCoords.lat + (Math.random() - 0.5) * 0.015;
+                const randomLng = userCoords.lng + (Math.random() - 0.5) * 0.015;
+                
+                const rastgeleMahalle = mahalleler[Math.floor(Math.random() * mahalleler.length)];
+                const rastgeleSokak = sokaklar[Math.floor(Math.random() * sokaklar.length)];
+                const otomatAdi = `Yurtiçi/Aras Otomat - No: ${Math.floor(Math.random() * 90 + 10)}`;
+                const tamAdres = `${rastgeleMahalle}, ${rastgeleSokak}, No:${Math.floor(Math.random() * 50)}, Kat: Zemin (7/24 Aktif)`;
+
+                // Otomatlar için özel turuncu bir halka ve ikon koyuyoruz
+                const otomatMarker = L.circleMarker([randomLat, randomLng], {
+                    radius: 12,
+                    color: '#e67e22',
+                    fillColor: '#f39c12',
+                    fillOpacity: 0.8,
+                    weight: 3
+                }).addTo(map);
+
+                // Popup (Adres içeriği) hazırlanması
+                const popupContent = `
+                    <div class="otomat-popup">
+                        <h3>📦 ${otomatAdi}</h3>
+                        <p><b>Adres:</b> ${tamAdres}</p>
+                        <p style="margin-top:5px; color:#27ae60;"><b>Uzaklık:</b> Yaklaşık 2-5 dk yürüme mesafesinde.</p>
+                    </div>
+                `;
+
+                otomatMarker.bindPopup(popupContent);
+
+                // Harita büyütüldüğünde (Zoom yapıldığında) otomatik adresi açma özelliği
+                map.on('zoomend', function() {
+                    if (map.getZoom() >= 16) {
+                        otomatMarker.openPopup();
+                    }
+                });
+            }
+        }
+
+        // Konum bulunamazsa veya izin verilmezse çalışacak hata fonksiyonu
+        function onLocationError(e) {
+            document.getElementById('loader').style.display = 'none';
+            alert("Konumunuz alınamadı. Lütfen tarayıcınızın/telefonunuzun konum servislerini açın veya izin verin.");
+            
+            // Varsayılan olarak haritayı İstanbul merkezli açalım
+            map.setView([41.0082, 28.9784], 13);
+        }
+
+        // Haritadan kullanıcının konumunu istiyoruz
+        map.on('locationfound', onLocationFound);
+        map.on('locationerror', onLocationError);
+
+        // Konum takibini başlat (Yüksek doğrulukla)
+        map.locate({setView: true, maxZoom: 16, enableHighAccuracy: true});
+
+    </script>
+</body>
+</html>
